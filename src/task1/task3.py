@@ -26,32 +26,32 @@ def is_inside_hexagon(point, center, radius):
     return np.isclose(sum_angles, 2*np.pi)
 
 
-def draw_figure_1():
+def compute_figure_1_data():
     polygon_vertices = [(25, 90), (0, 90), (25, 105), (115, 105), (115, 0), (95, 0), (95, 20)]
     arc_center = (25, 20)
     arc_radius = 70
     segment_length = 5
     arc_step_length = 5
 
-    polygon_points = split_polygon(polygon_vertices, segment_length)
-    arc_points = split_arc(arc_center, 0, np.pi / 2, arc_step_length, arc_radius)
-    internal_nodes = polygon_points + arc_points
-    tri = Delaunay(internal_nodes)
-    valid_triangles = [triangle for triangle in tri.simplices if
-                       not any(is_inside_circle(internal_nodes[vertex], arc_center, arc_radius) for vertex in triangle)]
-    valid_nodes = [node for node in internal_nodes if not is_inside_circle(node, arc_center, arc_radius)]
-    plt.figure(figsize=(10, 10))
-    plt.triplot([x[0] for x in internal_nodes], [x[1] for x in internal_nodes], valid_triangles, 'b-')
-    plt.scatter([x[0] for x in valid_nodes], [x[1] for x in valid_nodes], color='red', s=5)
-    plt.title('Delaunay Triangulation of Part A')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.grid(True)
-    plt.show()
+    raw_polygon_nodes = split_polygon(polygon_vertices, segment_length)
+    arc_nodes = split_arc(arc_center, 0, np.pi / 2, arc_step_length, arc_radius)
+
+    polygon_nodes = [node for node in raw_polygon_nodes if not is_inside_circle(node, arc_center, arc_radius)]
+
+    x_min, y_min = np.min(np.array(polygon_vertices), axis=0)
+    x_max, y_max = np.max(np.array(polygon_vertices), axis=0)
+    internal_nodes = [(x, y) for x in np.arange(x_min + 5, x_max, 10) for y in np.arange(y_min + 5, y_max, 10) if
+                      not is_inside_circle((x, y), arc_center, arc_radius)]
+
+    nodes = polygon_nodes + arc_nodes + internal_nodes
+    tri = Delaunay(nodes)
+    triangles = [triangle for triangle in tri.simplices if
+                 not is_inside_circle(np.mean(np.array(nodes)[triangle], axis=0), arc_center, arc_radius)]
+
+    return nodes, triangles
 
 
-def draw_figure_2():
+def compute_figure_2_data():
     segment_length = 10
     arc_step_length = 5
     main_frame_vertices = np.array([(0, 0), (0, 100), (210, 100), (210, 0)])
@@ -60,22 +60,25 @@ def draw_figure_2():
     hexagon_radius = 15
     circle_radius = 20
 
-    main_frame_points = split_polygon(main_frame_vertices, segment_length)
+    main_frame_nodes = split_polygon(main_frame_vertices, segment_length)
     hexagon_angles = np.linspace(0, 2*np.pi, 7)[:-1]
     hexagon_vertices = [(hexagon_center[0] + hexagon_radius * np.cos(angle), hexagon_center[1] + hexagon_radius * np.sin(angle)) for angle in hexagon_angles]
-    hexagon_points = split_polygon(hexagon_vertices, segment_length)
-    circle_points = split_arc(circle_center, 0, 2*np.pi, arc_step_length, circle_radius)
+    hexagon_nodes = split_polygon(hexagon_vertices, segment_length)
+    circle_nodes = split_arc(circle_center, 0, 2*np.pi, arc_step_length, circle_radius)
 
-    internal_points = [(x, y) for x in np.arange(5, 205, 10) for y in np.arange(5, 95, 10) if not (is_inside_circle((x, y), circle_center, circle_radius) or is_inside_hexagon((x, y), hexagon_center, hexagon_radius))]
-    all_points = np.vstack([main_frame_points, hexagon_points, circle_points, internal_points])
-    tri = Delaunay(all_points)
+    internal_nodes = [(x, y) for x in np.arange(5, 205, 10) for y in np.arange(5, 95, 10) if not (is_inside_circle((x, y), circle_center, circle_radius) or is_inside_hexagon((x, y), hexagon_center, hexagon_radius))]
+    nodes = main_frame_nodes + hexagon_nodes + circle_nodes + internal_nodes
+    tri = Delaunay(nodes)
+    triangles = [triangle for triangle in tri.simplices if not (is_inside_circle(np.mean(np.array(nodes)[triangle], axis=0), circle_center, circle_radius) or is_inside_hexagon(np.mean(np.array(nodes)[triangle], axis=0), hexagon_center, hexagon_radius))]
 
-    valid_simplices = [simplex for simplex in tri.simplices if not (is_inside_circle(np.mean(all_points[simplex], axis=0), circle_center, circle_radius) or is_inside_hexagon(np.mean(all_points[simplex], axis=0), hexagon_center, hexagon_radius))]
+    return nodes, triangles
 
+
+def draw_figure(nodes, triangles, title):
     plt.figure(figsize=(10, 10))
-    plt.triplot(all_points[:, 0], all_points[:, 1], valid_simplices, 'b-')
-    plt.scatter(all_points[:, 0], all_points[:, 1], color='red', s=5)
-    plt.title('Delaunay Triangulation of Part B')
+    plt.triplot([node[0] for node in nodes], [node[1] for node in nodes], triangles, 'b-')
+    plt.scatter([node[0] for node in nodes], [node[1] for node in nodes], color='red', s=5)
+    plt.title(title)
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.gca().set_aspect('equal', adjustable='box')
@@ -84,5 +87,8 @@ def draw_figure_2():
 
 
 if __name__ == "__main__":
-    draw_figure_1()
-    draw_figure_2()
+    nodes_1, triangles_1 = compute_figure_1_data()
+    draw_figure(nodes_1, triangles_1, 'Delaunay Triangulation of Part A')
+
+    nodes_2, triangles_2 = compute_figure_2_data()
+    draw_figure(nodes_2, triangles_2, 'Delaunay Triangulation of Part B')
